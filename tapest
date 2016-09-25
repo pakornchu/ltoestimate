@@ -1,0 +1,76 @@
+#!/usr/bin/python
+
+# Copyright (c) 2016 Pakorn C.
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy of 
+# this software and associated documentation files (the "Software"), to deal in 
+# the Software without restriction, including without limitation the rights to 
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+# of the Software, and to permit persons to whom the Software is furnished to do 
+# so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all 
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+# SOFTWARE.
+
+import sys
+import os.path
+try:
+	import lzo
+except:
+	print 'LZO Module not found'
+	sys.exit(1)
+
+# Chunk size (KiB)
+BLOCKSIZE = 1024
+BLOCKORDER = [0, 0.33, 0.66]
+
+def estimate(filename):
+	READBYTE = BLOCKSIZE * 1024
+	if os.path.isfile(filename):
+		src = open(filename, 'rb')
+		if os.path.getsize(filename) > READBYTE * (len(BLOCKORDER) + 1):
+			filesize = os.path.getsize(filename)
+			# Adaptive estimation
+			population = 0.00
+			for i in BLOCKORDER:
+				src.seek(i * filesize, 0)
+				datablock = src.read(READBYTE)
+				origsize = len(datablock)
+				newsize = len(lzo.compress(datablock))
+				ratio = float(newsize) / float(origsize)
+				population += ratio
+			return (population / len(BLOCKORDER)) * 100
+		else:
+			# First block estimation
+			if os.path.getsize(filename) > READBYTE:
+				datablock = src.read(READBYTE)
+			else:
+				datablock = src.read()
+			src.close()
+			origsize = len(datablock)
+			compressed = lzo.compress(datablock)
+			newsize = len(compressed)
+			if origsize > newsize:
+				ratio = (float(newsize) / float(origsize))
+				return ratio * 100
+			else:
+				return 100.00
+	return None
+
+
+if __name__ == '__main__':
+	if len(sys.argv) != 2:
+		print 'USAGE: tapest FILE'
+		sys.exit(2)
+	result = estimate(sys.argv[1])
+	if result is not None:
+		print '%.2f' % result
+	sys.exit(0)

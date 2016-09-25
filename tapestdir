@@ -1,0 +1,85 @@
+#!/usr/bin/python
+
+# Copyright (c) 2016 Pakorn C.
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy of 
+# this software and associated documentation files (the "Software"), to deal in 
+# the Software without restriction, including without limitation the rights to 
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+# of the Software, and to permit persons to whom the Software is furnished to do 
+# so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all 
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+# SOFTWARE.
+
+import os
+import sys
+import threading
+import Queue
+import commands
+import signal
+import time
+
+READERS = 4				# Number of threads
+TAPESTBIN = '/usr/local/bin/tapest'	# tapest location
+TAPESIZE = 2500				# Tape size in MiB
+
+def signalHandler(signal, frame):
+	sys.exit(0)
+
+def worker(q):
+	global SIGMA
+	global N
+	while True:
+		job = q.get()
+		cmd = '%s %s' % (TAPESTBIN, job)
+		status, output = commands.getstatusoutput(cmd)
+		if status == 0:
+			SIGMA += float(output)
+			N += 1
+		q.task_done()
+
+if __name__ == '__main__':
+	if len(sys.argv) == 1:
+		print 'USAGE: tapestdir DIRNAME'
+		sys.exit(1)
+
+	queue = Queue.Queue()
+	for i in range(READERS):
+		thobj = threading.Thread(target=worker,	args=(queue, ))
+		thobj.setDaemon(True)
+		thobj.start()
+	GLOBALSIGMA = 0.00
+	GLOBALN = 0
+	for item in sys.argv[1:]:
+		SIGMA = 0.00
+		N = 0
+		if not os.path.isdir(sys.argv[1]):
+			sys.exit(2)
+
+		for i in os.walk(item):
+			for j in i[2]:
+				filename = '%s/%s' % (i[0], j)
+				queue.put(filename)
+
+		while True:
+			if not queue.empty():
+				time.sleep(0.5)
+			else:
+				break
+		sys.stdout.write('%-9.2f %s\n' % (SIGMA/N, item))
+		sys.stdout.flush()
+		GLOBALSIGMA += SIGMA/N
+		GLOBALN += 1
+	print '%-9.2f average' % (GLOBALSIGMA/GLOBALN,)
+	newtapesize = TAPESIZE * (1 + (100 - (GLOBALSIGMA/GLOBALN))/100)
+	print '%-9.2f available' % newtapesize
+	sys.exit(0)
