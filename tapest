@@ -23,54 +23,54 @@
 import sys
 import os.path
 try:
-	import lzo
+    import lzo
 except:
-	print 'LZO Module not found'
-	sys.exit(1)
+    print 'LZO Module not found'
+    sys.exit(1)
 
 # Chunk size (KiB)
 BLOCKSIZE = 1024
 BLOCKORDER = [0, 0.33, 0.66]
 
 def estimate(filename):
-	READBYTE = BLOCKSIZE * 1024
-	if os.path.isfile(filename):
-		src = open(filename, 'rb')
-		if os.path.getsize(filename) > READBYTE * (len(BLOCKORDER) + 1):
-			filesize = os.path.getsize(filename)
-			# Adaptive estimation
-			population = 0.00
-			for i in BLOCKORDER:
-				src.seek(i * filesize, 0)
-				datablock = src.read(READBYTE)
-				origsize = len(datablock)
-				newsize = len(lzo.compress(datablock))
-				ratio = float(newsize) / float(origsize)
-				population += ratio
-			return (population / len(BLOCKORDER)) * 100
-		else:
-			# First block estimation
-			if os.path.getsize(filename) > READBYTE:
-				datablock = src.read(READBYTE)
-			else:
-				datablock = src.read()
-			src.close()
-			origsize = len(datablock)
-			compressed = lzo.compress(datablock)
-			newsize = len(compressed)
-			if origsize > newsize:
-				ratio = (float(newsize) / float(origsize))
-				return ratio * 100
-			else:
-				return 100.00
-	return None
+    READBYTE = BLOCKSIZE * 1024
+    if os.path.isfile(filename):
+        src = open(filename, 'rb')
+        if os.path.getsize(filename) > READBYTE * (len(BLOCKORDER) + 1):
+            filesize = os.path.getsize(filename)
+            # Adaptive estimation
+            population = 0.00
+            for i in BLOCKORDER:
+                src.seek(i * filesize, 0)
+                datablock = src.read(READBYTE)
+                origsize = len(datablock)
+                newsize = len(lzo.compress(datablock))
+                ratio = float(newsize) / float(origsize)
+                population += ratio
+            return (population / len(BLOCKORDER)) * 100
+        else:
+            # First block estimation
+            if os.path.getsize(filename) > READBYTE:
+                datablock = src.read(READBYTE)
+            else:
+                datablock = src.read()
+            src.close()
+            origsize = len(datablock)
+            compressed = lzo.compress(datablock)
+            newsize = len(compressed)
+            if origsize > newsize:
+                ratio = (float(newsize) / float(origsize))
+                return ratio * 100
+            else:
+                return 100.00
+    return None
 
 
 if __name__ == '__main__':
-	if len(sys.argv) != 2:
-		print 'USAGE: tapest FILE'
-		sys.exit(2)
-	result = estimate(sys.argv[1])
-	if result is not None:
-		print '%.2f' % result
-	sys.exit(0)
+    if len(sys.argv) != 2:
+        print 'USAGE: tapest FILE'
+        sys.exit(2)
+    result = estimate(sys.argv[1])
+    if result is not None:
+        print '%.2f' % result
+    sys.exit(0)
